@@ -19,19 +19,19 @@ import argparse
 ### Importing useful scripts
 from utils import *
 
-### Main functioning of script
-def main(pathToInput):
+### Trackpy data analysis and storage portion of scipt
+def tp_analysis(pathToInput):
 
 	## Create output folder
 	if not os.path.exists('output/'):
 		os.makedirs('output/')
-	# os.mkdir('output/' + pathToInput)
+	os.mkdir('output/' + pathToInput)
 
 	## Convert all YOLOv5 with angles label files to a single pandas file
-	# YOLOv5_to_pandas_file_all(pathToInput)
+	YOLOv5_to_pandas_file_all(pathToInput)
 
 	## Link pandas csv with trackpy link
-	# link_pandas(pathToInput, maxDisp=10, maxMem=25, fMin=10)
+	link_pandas(pathToInput, maxDisp=10, maxMem=25, fMin=10)
 
 	## Organize the linked csv into better, faster txt storage
 	better_storage(pathToInput)
@@ -46,5 +46,5 @@ if __name__ == '__main__':
 	## Input directory inside 'input/'
 	pathToInput = 'r1/'
 	
-	## Call main
-	main(pathToInput)
+	## Call trackpy analysis
+	tp_analysis(pathToInput)
