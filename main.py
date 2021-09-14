@@ -36,6 +36,9 @@ def tp_analysis(pathToInput):
 	## Organize the linked csv into better, faster txt storage
 	better_storage(pathToInput)
 
+	## Get and store binary classifier data to be classified
+	binary_data(pathToInput)
+
 	## End of function
 	return
 

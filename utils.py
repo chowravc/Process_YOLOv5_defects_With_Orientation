@@ -152,7 +152,7 @@ def link_pandas(runDir, maxDisp=10, maxMem=25, fMin=10):
 	plt.clf()
 
 	## Plot the figure
-	plt.figure()
+	# plt.figure()
 
 	## Plot trajectories of the defects
 	tp.plot_traj(linkedData);
@@ -163,7 +163,7 @@ def link_pandas(runDir, maxDisp=10, maxMem=25, fMin=10):
 
 
 ### Save framewise data
-def save_framewise(runDir, data):
+def save_framewise(runDir, data, cutoff):
 
 	## Create the output directory
 	os.mkdir('output/' + runDir + 'framewise_data/')
@@ -210,37 +210,40 @@ def save_framewise(runDir, data):
 				# Update current frame
 				lastFrame = currentFrame
 
-		# Choose the output file name using current frame name
-		fileName = 'output/' + runDir + 'framewise_data/' + 'frame_' + str(currentFrame).zfill(4) + '.txt'
+		# Check to make sure the current frame is beyond first frame in focus
+		if currentFrame >= cutoff:
 
-		# Open the file
-		savefile = open(fileName, "a")
+			# Choose the output file name using current frame name
+			fileName = 'output/' + runDir + 'framewise_data/' + 'frame_' + str(currentFrame).zfill(4) + '.txt'
 
-		# Read the x-position
-		x_val = data['x'][i]
+			# Open the file
+			savefile = open(fileName, "a")
 
-		# Read the y-position
-		y_val = data['y'][i]
+			# Read the x-position
+			x_val = data['x'][i]
 
-		# Read the orientation angle
-		angle = data['angle'][i]
+			# Read the y-position
+			y_val = data['y'][i]
 
-		# Read the defect number
-		particle = data['particle'][i]
+			# Read the orientation angle
+			angle = data['angle'][i]
 
-		# Add all these details to the line
-		outLine = str(particle) + ' ' + str(x_val) + ' ' + str(y_val) +  ' ' + str(angle) + '\n'
+			# Read the defect number
+			particle = data['particle'][i]
 
-		# Write the line
-		savefile.write(outLine)
+			# Add all these details to the line
+			outLine = str(particle) + ' ' + str(x_val) + ' ' + str(y_val) +  ' ' + str(angle) + '\n'
 
-		# Close the file
-		savefile.close()
+			# Write the line
+			savefile.write(outLine)
+
+			# Close the file
+			savefile.close()
 
 
 
 ### Save particlewise (defectwise) data
-def save_particlewise(runDir, data):
+def save_particlewise(runDir, data, cutoff):
 
 	## Create the output directory
 	os.mkdir('output/' + runDir + 'particlewise_data/')
@@ -301,11 +304,14 @@ def save_particlewise(runDir, data):
 				# Read current frame
 				frame = data['frame'][j]
 
-				# Create the line to store outputs
-				outLine = str(frame) + ' ' + str(x_val) + ' ' + str(y_val) + ' ' + str(angle) + '\n'
+				# If the current frame is greater than cutoff
+				if frame >= cutoff:
 
-				# Write the outputs to the file
-				savefile.write(outLine)
+					# Create the line to store outputs
+					outLine = str(frame) + ' ' + str(x_val) + ' ' + str(y_val) + ' ' + str(angle) + '\n'
+
+					# Write the outputs to the file
+					savefile.write(outLine)
 
 		# Close the file
 		savefile.close()
@@ -313,7 +319,7 @@ def save_particlewise(runDir, data):
 
 
 ### Store the linked pandas csv to a better format
-def better_storage(runDir):
+def better_storage(runDir, cutoff=100):
 
 	## Get file path to input csv linked
 	inputFile = 'output/' + runDir + 'labels_pandas_linked.csv'
@@ -324,8 +330,31 @@ def better_storage(runDir):
 
 	print('\nSaving framewise data.')
 	## Save framewise data from linked
-	save_framewise(runDir, linkedData)
+	save_framewise(runDir, linkedData, cutoff=cutoff)
 
 	print('\nSaving particlewise data..')
 	## Save particlewise data from linked
-	save_particlewise(runDir, linkedData)
+	save_particlewise(runDir, linkedData, cutoff=cutoff)
+
+
+
+### Get and store binary classifier data for each defect
+def binary_data(runDir):
+
+	## Create output directory
+	os.mkdir('output/' + runDir + 'binary_classifier_data/')
+
+	## Read all input defects
+	filePaths = glob.glob('output/' + runDir + 'particlewise_data/*.txt')
+
+	## Go through every filepath
+	for filePath in filePaths:
+
+		# Read file
+		file = open(filePath, 'r')
+
+		# Read lines from file
+		text = file.read()
+
+		# Close file
+		file.close()
