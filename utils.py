@@ -146,16 +146,140 @@ def link_pandas(runDir, maxDisp=10, maxMem=25, fMin=10):
 	print('After filter:', linkedData['particle'].nunique())
 
 	## Save linked output file
-	linkedData.to_csv(outputFile, index=False) 
+	linkedData.to_csv(outputFile, index=False)
+
+
+
+### Remove particles created after frame cutoff and cutoff the rest to start at frame cutoff
+def fix_linking(runDir, cutoff=100):
+
+	## Get file path to input csv
+	inputFile = 'output/' + runDir + 'labels_pandas_linked.csv'
+
+	## Read input data
+	inputData = pd.read_csv(inputFile)
+
+	## Get file path to output csv
+	outputFile = 'output/' + runDir + 'labels_pandas_linked_cutoff.csv'
+
+	print('\nFixing linked defects.')
+
+	## Get the number of rows in the csv
+	rows = len(inputData['frame'])
+
+	## Dictionary to store output data
+	dictOut = {
+		'x': [],
+		'y': [],
+		'mass': [],
+		'size': [],
+		'ecc': [],
+		'signal': [],
+		'raw_mass': [],
+		'ep': [],
+		'frame': [],
+		'angle': [],
+		'particle': []
+	}
+
+	## Store particles that have already been checked to be created before cutoff
+	passingParticles = []
+
+	## Store particles that were created after cutoff
+	failingParticles = []
+
+	## Go through every row
+	for i in range(rows):
+
+		# Display progress every 1000 rows
+		if i == 0 or i%1000 == 0:
+
+			print(str(100*i/rows)[:5] + '%')
+
+		# Extract all information in current row
+		x_par = inputData['x'][i]
+		y_par = inputData['y'][i]
+		mass_par = inputData['mass'][i]
+		size_par = inputData['size'][i]
+		ecc_par = inputData['ecc'][i]
+		signal_par = inputData['signal'][i]
+		raw_mass_par = inputData['raw_mass'][i]
+		ep_par = inputData['ep'][i]
+		frame_par = int(inputData['frame'][i])
+		angle_par = inputData['angle'][i]
+		particle_par = int(inputData['particle'][i])
+
+		# If this particle had passed
+		if particle_par in passingParticles:
+
+			# Check if the current frame is past cutoff
+			if frame_par >= cutoff:
+
+				# Add the current row information to output
+				dictOut['x'].append(x_par)
+				dictOut['y'].append(y_par)
+				dictOut['mass'].append(mass_par)
+				dictOut['size'].append(size_par)
+				dictOut['ecc'].append(ecc_par)
+				dictOut['signal'].append(signal_par)
+				dictOut['raw_mass'].append(raw_mass_par)
+				dictOut['ep'].append(ep_par)
+				dictOut['frame'].append(frame_par)
+				dictOut['angle'].append(angle_par)
+				dictOut['particle'].append(particle_par)
+
+		# If this particle had failed
+		elif particle_par in failingParticles:
+
+			# Do nothing and go to the next line
+			continue
+
+		# If this particle is brand new and untested
+		else:
+
+			# If the first frame is before cutoff
+			if frame_par <= cutoff:
+
+				# Add the particle to passing particles
+				passingParticles.append(particle_par)
+
+				# Check if the current frame is past cutoff
+				if frame_par >= cutoff:
+
+					# Add the current row information to output
+					dictOut['x'].append(x_par)
+					dictOut['y'].append(y_par)
+					dictOut['mass'].append(mass_par)
+					dictOut['size'].append(size_par)
+					dictOut['ecc'].append(ecc_par)
+					dictOut['signal'].append(signal_par)
+					dictOut['raw_mass'].append(raw_mass_par)
+					dictOut['ep'].append(ep_par)
+					dictOut['frame'].append(frame_par)
+					dictOut['angle'].append(angle_par)
+					dictOut['particle'].append(particle_par)
+
+			# If the first frame is after cutoff
+			if frame_par > cutoff:
+
+				# Blacklist the particle
+				failingParticles.append(particle_par)
+
+	## Convert output dictionary to pandas dataframe
+	dictOut = DataFrame.from_dict(dictOut)
+
+	print('\nShowing filter results (particle number).')
+	print('Before filter:', inputData['particle'].nunique())
+	print('After filter:', dictOut['particle'].nunique())
+
+	## Save output file with cutoff
+	dictOut.to_csv(outputFile, index=False)
 
 	## Clear plots
 	plt.clf()
 
-	## Plot the figure
-	# plt.figure()
-
 	## Plot trajectories of the defects
-	tp.plot_traj(linkedData);
+	tp.plot_traj(dictOut);
 
 	## Clear plots
 	plt.clf()
@@ -163,7 +287,7 @@ def link_pandas(runDir, maxDisp=10, maxMem=25, fMin=10):
 
 
 ### Save framewise data
-def save_framewise(runDir, data, cutoff):
+def save_framewise(runDir, data):
 
 	## Create the output directory
 	os.mkdir('output/' + runDir + 'framewise_data/')
@@ -210,40 +334,37 @@ def save_framewise(runDir, data, cutoff):
 				# Update current frame
 				lastFrame = currentFrame
 
-		# Check to make sure the current frame is beyond first frame in focus
-		if currentFrame >= cutoff:
+		# Choose the output file name using current frame name
+		fileName = 'output/' + runDir + 'framewise_data/' + 'frame_' + str(currentFrame).zfill(4) + '.txt'
 
-			# Choose the output file name using current frame name
-			fileName = 'output/' + runDir + 'framewise_data/' + 'frame_' + str(currentFrame).zfill(4) + '.txt'
+		# Open the file
+		savefile = open(fileName, "a")
 
-			# Open the file
-			savefile = open(fileName, "a")
+		# Read the x-position
+		x_val = data['x'][i]
 
-			# Read the x-position
-			x_val = data['x'][i]
+		# Read the y-position
+		y_val = data['y'][i]
 
-			# Read the y-position
-			y_val = data['y'][i]
+		# Read the orientation angle
+		angle = data['angle'][i]
 
-			# Read the orientation angle
-			angle = data['angle'][i]
+		# Read the defect number
+		particle = data['particle'][i]
 
-			# Read the defect number
-			particle = data['particle'][i]
+		# Add all these details to the line
+		outLine = str(particle) + ' ' + str(x_val) + ' ' + str(y_val) +  ' ' + str(angle) + '\n'
 
-			# Add all these details to the line
-			outLine = str(particle) + ' ' + str(x_val) + ' ' + str(y_val) +  ' ' + str(angle) + '\n'
+		# Write the line
+		savefile.write(outLine)
 
-			# Write the line
-			savefile.write(outLine)
-
-			# Close the file
-			savefile.close()
+		# Close the file
+		savefile.close()
 
 
 
 ### Save particlewise (defectwise) data
-def save_particlewise(runDir, data, cutoff):
+def save_particlewise(runDir, data):
 
 	## Create the output directory
 	os.mkdir('output/' + runDir + 'particlewise_data/')
@@ -304,14 +425,11 @@ def save_particlewise(runDir, data, cutoff):
 				# Read current frame
 				frame = data['frame'][j]
 
-				# If the current frame is greater than cutoff
-				if frame >= cutoff:
+				# Create the line to store outputs
+				outLine = str(frame) + ' ' + str(x_val) + ' ' + str(y_val) + ' ' + str(angle) + '\n'
 
-					# Create the line to store outputs
-					outLine = str(frame) + ' ' + str(x_val) + ' ' + str(y_val) + ' ' + str(angle) + '\n'
-
-					# Write the outputs to the file
-					savefile.write(outLine)
+				# Write the outputs to the file
+				savefile.write(outLine)
 
 		# Close the file
 		savefile.close()
@@ -319,10 +437,10 @@ def save_particlewise(runDir, data, cutoff):
 
 
 ### Store the linked pandas csv to a better format
-def better_storage(runDir, cutoff=100):
+def better_storage(runDir):
 
 	## Get file path to input csv linked
-	inputFile = 'output/' + runDir + 'labels_pandas_linked.csv'
+	inputFile = 'output/' + runDir + 'labels_pandas_linked_cutoff.csv'
 
 	## Starting from stored linked data
 	print('\nReading csv linked datafile.')
@@ -330,11 +448,11 @@ def better_storage(runDir, cutoff=100):
 
 	print('\nSaving framewise data.')
 	## Save framewise data from linked
-	save_framewise(runDir, linkedData, cutoff=cutoff)
+	save_framewise(runDir, linkedData)
 
 	print('\nSaving particlewise data..')
 	## Save particlewise data from linked
-	save_particlewise(runDir, linkedData, cutoff=cutoff)
+	save_particlewise(runDir, linkedData)
 
 
 

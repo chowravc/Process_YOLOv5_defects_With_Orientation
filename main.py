@@ -33,11 +33,14 @@ def tp_analysis(pathToInput):
 	## Link pandas csv with trackpy link
 	link_pandas(pathToInput, maxDisp=10, maxMem=25, fMin=10)
 
+	## Remove particles created after frame cutoff and cutoff the rest to start at frame cutoff
+	fix_linking(pathToInput, cutoff=100)
+
 	## Organize the linked csv into better, faster txt storage
 	better_storage(pathToInput)
 
 	## Get and store binary classifier data to be classified
-	binary_data(pathToInput)
+	# binary_data(pathToInput)
 
 	## End of function
 	return
