@@ -456,8 +456,159 @@ def better_storage(runDir):
 
 
 
+
+### Detect and remove discontinuities
+def make_cont(angles, show=False):
+
+	outAngles = []
+	outAngles.append(angles[0])
+
+	iterations = 0
+
+	for i, angleB in enumerate(angles):
+
+		if i >= 1:
+
+			# For the very first angle, use the fixed version
+			angleA = outAngles[i-1]
+
+			delta = abs(angleA - angleB)
+			sign = angleA < angleB
+
+			# General Case: No discontinouity
+			# delta < 20
+			# Sign is True or False
+
+			# Case 1: The angle goes over 180
+			# Angle A is just below 180
+			# Angle B is just above 0
+
+			# So, delta = ~180
+			# Sign is negative
+			# Add 180 to angle B
+
+			# Case 2: The angle goes below 0
+			# Angle A is just above 0
+			# Angle B is just below 180
+
+			# So, angle A - angle B = ~-180
+
+			iterations = 0
+
+			# Subtract 180 from angle B
+			if delta < 50:
+
+				outAngles.append(angleB)
+
+			else:
+
+				if not sign: # Case 1
+
+					while delta > 50 and iterations < 15:
+
+						iterations = iterations + 1
+
+						if iterations == 15:
+							return np.asarray(outAngles)
+
+						angleB = angleB + 180
+
+						delta = abs(angleA - angleB)
+
+				else: # Case 2
+
+					while delta > 50 and iterations < 15:
+
+						iterations = iterations + 1
+
+						if iterations == 15:
+							return np.asarray(outAngles)
+
+						angleB = angleB - 180
+
+						delta = abs(angleA - angleB)
+
+				outAngles.append(angleB)
+
+	outAngles = np.asarray(outAngles)
+
+	if show:
+
+		plt.clf()
+
+		plt.scatter(np.linspace(0, len(angles)-1, len(angles)), angles - 500, s=1)
+		plt.scatter(np.linspace(0, len(angles)-1, len(angles)), outAngles, s=1)
+		plt.legend(['original (500 subtracted)', 'fixed'])
+		plt.show()
+		plt.clf()
+
+	if iterations >= 5:
+		print('Iter:', iterations)
+
+	return outAngles
+
+
+
+### Helper to handle indices and logical indices of NaNs
+def nan_helper(y):
+	"""Helper to handle indices and logical indices of NaNs.
+
+	Input:
+		- y, 1d numpy array with possible NaNs
+	Output:
+		- nans, logical indices of NaNs
+		- index, a function, with signature indices= index(logical_indices),
+		  to convert logical indices of NaNs to 'equivalent' indices
+	Example:
+		>>> # linear interpolation of NaNs
+		>>> nans, x= nan_helper(y)
+		>>> y[nans]= np.interp(x(nans), x(~nans), y[~nans])
+	"""
+
+	return np.isnan(y), lambda z: z.nonzero()[0]
+
+
+
+### Replace any missing frames with angle NaN
+def replace_missing(frames, angles):
+
+	# Convert the frames from float to integer
+	frames = np.asarray(frames).astype(int)
+
+	# List to store frames
+	outFrames = []
+
+	# List to store angles
+	outAngles = []
+
+	# Go through every frame that SHOULD be there
+	for frame in range(frames[0], frames[-1]+1):
+
+		# If the frame is actually there
+		if frame in frames:
+
+			# Append it to the output list
+			outFrames.append(frame)
+
+			# Append the corresponding angle to the output list
+			outAngles.append(angles[np.where(frames == frame)[0][0]])
+
+		# If the frame was not there
+		else:
+
+			# Add the frame
+			outFrames.append(frame)
+
+			# Use a NaN value as placeholder angle
+			outAngles.append(np.nan)
+
+	# Return the lists to the output
+	return [np.asarray(outFrames), np.asarray(outAngles)]
+
+
+
 ### Get and store binary classifier data for each defect
-def binary_data(runDir):
+def binary_data(runDir, minPoints=4):
 
 	## Create output directory
 	os.mkdir('output/' + runDir + 'binary_classifier_data/')
@@ -468,11 +619,62 @@ def binary_data(runDir):
 	## Go through every filepath
 	for filePath in filePaths:
 
-		# Read file
-		file = open(filePath, 'r')
+		# Particle number
+		particle = int(filePath.split('.')[0].split('_')[-1])
 
-		# Read lines from file
-		text = file.read()
+		# Check if the file is empty
+		if os.stat(filePath).st_size == 0:
 
-		# Close file
-		file.close()
+			# Ignore and continue
+			continue
+
+		# If the file is not empty
+		else:
+
+			# Read file as numpy array
+			inMat = np.loadtxt(filePath)
+
+			# Check if it is a 2d array and at least minimum points exist
+			if len(inMat.shape) == 2 and len(inMat) >= minPoints:
+
+				# Transpose the matrix
+				inMatTrans = inMat.T
+
+				# Get individual list of frames
+				frames = inMatTrans[0]
+
+				# Get individual list of angles
+				angles = inMatTrans[-1]
+
+				# Fix any missing values
+				fs_and_as = replace_missing(frames, angles)
+
+				# Fetch frames and angles arrays again
+				frames, angles =  fs_and_as[0], fs_and_as[1]
+
+				# Clear list
+				fs_and_as = None
+
+				# Use NaN helper
+				nans, x = nan_helper(angles)
+
+				# Interpolate the missing values
+				angles[nans] = np.interp(x(nans), x(~nans), angles[~nans])
+
+				# Make the list of angles continuous by fixing 0-180 jumps
+				angles = make_cont(angles, show=False)
+
+				# Defect duration (length) in frames
+				fLen = frames[-1] - frames[0]
+
+				# Mean value of defect orientation
+				meanAngle = np.mean(angles)
+
+				# Mean value of defect orientation
+				stdAngle = np.std(angles)
+
+				# Out file name
+				outFile = 'output/' + runDir + 'binary_classifier_data/' + str(particle).zfill(4) + '.txt'
+
+				# Store the output to the dataset
+				np.savetxt(outFile, np.asarray([meanAngle, stdAngle, fLen]))

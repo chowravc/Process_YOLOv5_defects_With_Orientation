@@ -40,7 +40,7 @@ def tp_analysis(pathToInput):
 	better_storage(pathToInput)
 
 	## Get and store binary classifier data to be classified
-	# binary_data(pathToInput)
+	binary_data(pathToInput, minPoints=4)
 
 	## End of function
 	return
