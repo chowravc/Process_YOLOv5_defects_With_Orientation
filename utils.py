@@ -14,6 +14,7 @@ import pims
 import trackpy as tp
 import glob
 import argparse
+import json
 
 
 ### Importing useful scripts
@@ -114,6 +115,72 @@ def YOLOv5_to_pandas_file_all(runDir):
 	pandasOutput.to_csv(outputFile, index=False)
 
 	print('Done. Output saved to ' + outputFile)
+
+
+
+### Convert and save YOLOv5 files as JSON
+def YOLOv5_as_JSON(runDir):
+
+	## Create output JSON directory
+	os.mkdir('output/' + runDir + 'JSON/')
+
+	## Converting txt file
+	dims = (1104, 800) # Image dimensions
+
+	## yoloFiles
+	yoloFiles = glob.glob('input/' + runDir + 'YOLOv5_labels/*.txt')
+
+	## Go through every YOLO file
+	for yoloFile in yoloFiles:
+
+		print('Adding file ' + yoloFile)
+
+		# Read YOLO file
+		readFile = open(yoloFile, 'r')
+
+		# Read lines from YOLO file
+		lines = readFile.read().split('\n')
+
+		# Use this to store the line of defects
+		defects = []
+
+		# For every line
+		for line in lines:
+
+			# If the line is not empty
+			if len(line) != 0:
+
+				# vector in the YOLOv5 format: class x_center y_center width height confidence
+				v = line.split(' ')
+
+				# Inputs in YOLOv5 format
+				inClass = v[0] # Class number
+				inXC = float(v[1])*dims[0] # Center of the bounding box X-coord
+				inYC = float(v[2])*dims[1] # Center of the bounding box Y-coord
+				inW = float(v[3])*dims[0] # Width of the bounding box
+				inH = float(v[4])*dims[1] # Height of the bounding bo
+				inConf = float(v[5]) # Confidence of detection
+				inAngle = float(v[6]) # Orientation angle of detection
+
+				# Find pixel coordinates of the top left pixel of bounding box
+				top_left_x = inXC - inW/2
+				top_left_y = inYC - inH/2
+
+				# Find pixel coordinates of the bottom right pixel of bounding box
+				bottom_right_x = inXC + inW/2
+				bottom_right_y = inYC + inH/2
+
+				# Add the defect to the list
+				defects.append({"label": "class", "confidence": inConf, "topleft": {"x": top_left_x, "y": top_left_y}, "bottomright": {"x": bottom_right_x, "y": bottom_right_y}})
+
+		## Path to output JSON
+		outJSON = yoloFile.replace('YOLOv5_labels', 'JSON').replace('input', 'output').replace('txt', 'json')
+
+		## Open the output JSON
+		with open(outJSON, 'w') as f:
+
+			# Dump all the data
+			json.dump(defects, f)
 
 
 
